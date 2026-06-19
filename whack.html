@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Whack-a-D*ck</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Arial Rounded MT Bold', 'Arial Black', Arial, sans-serif;
+  background:
+    linear-gradient(180deg,
+      #5BB8F5 0%, #87CEEB 30%,
+      #87CEEB 40%, #7EC850 40%,
+      #5A9E32 55%, #4A8020 100%);
+  cursor: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+/* ── HUD ─────────────────────────────────────────────────────── */
+#hud {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 7vmin;
+  background: rgba(20, 10, 0, 0.82);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 3vmin;
+  z-index: 50;
+  border-bottom: 0.25vmin solid rgba(255, 210, 50, 0.35);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+#hud-title {
+  font-size: 2.6vmin;
+  color: #FFD700;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 12px rgba(255,215,0,0.6);
+}
+
+.hud-stat { font-size: 2.4vmin; color: #ffe; }
+.hud-stat b { color: #FFD700; font-size: 2.9vmin; }
+#hud-timer b { color: #FF7070; }
+
+#mute-btn {
+  background: rgba(255,255,255,0.12);
+  border: 0.2vmin solid rgba(255,255,255,0.25);
+  color: white;
+  font-size: 2.4vmin;
+  width: 4.8vmin;
+  height: 4.8vmin;
+  border-radius: 50%;
+  cursor: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+#mute-btn:hover { background: rgba(255,255,255,0.22); }
+
+/* ── GAME BOARD ──────────────────────────────────────────────── */
+#board {
+  position: fixed;
+  top: 7vmin; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#grid {
+  display: grid;
+  grid-template-columns: repeat(3, 23vmin);
+  grid-template-rows: repeat(3, 30vmin);
+  gap: 1vmin 2vmin;
+}
+
+/* ── HOLE ────────────────────────────────────────────────────── */
+.hole-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Ground patch around hole */
+.ground-patch {
+  position: absolute;
+  bottom: 0;
+  width: 21vmin;
+  height: 7vmin;
+  background: radial-gradient(ellipse at 50% 40%, #6CB840 0%, #4A8A1E 60%, #3A6E14 100%);
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Visible area above hole where penis rises into */
+.dude-stage {
+  width: 13vmin;
+  height: 26vmin;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+/* Penis element inside clip */
+.dude {
+  width: 12vmin;
+  height: 25vmin;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(108%);
+  transform-origin: 50% 100%;
+  transition: transform 0.3s cubic-bezier(0.34, 1.5, 0.64, 1);
+  pointer-events: none;
+}
+
+/* End-of-game dance party — bob up and down, wagging side to side */
+@keyframes dance {
+  0%   { transform: translateX(-50%) translateY(22%)  rotate(-6deg); }
+  50%  { transform: translateX(-50%) translateY(-8%)  rotate(6deg); }
+  100% { transform: translateX(-50%) translateY(22%)  rotate(-6deg); }
+}
+.hole-wrap.dancing .dude {
+  animation: dance 0.5s ease-in-out infinite;
+}
+
+.hole-wrap.up .dude {
+  transform: translateX(-50%) translateY(0%);
+}
+
+.hole-wrap.hiding .dude {
+  transform: translateX(-50%) translateY(108%);
+  transition: transform 0.38s cubic-bezier(0.55, 0, 1, 0.45);
+}
+
+/* Dark hole oval — sits ON TOP of the stage so penis appears to emerge from it */
+.hole-oval {
+  width: 17vmin;
+  height: 7.5vmin;
+  background: radial-gradient(ellipse at 50% 35%, #050200 0%, #130900 55%, #1e1000 100%);
+  border-radius: 50%;
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+  margin-top: -4.5vmin;
+  box-shadow:
+    inset 0 3px 12px rgba(0,0,0,0.95),
+    0 3px 10px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+
+/* Whack shake — .dude-stage is flex-centered (no base transform), so shake
+   around 0, not -50%, or the figure lurches sideways on every hit. */
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  15%  { transform: translateX(-0.9vmin); }
+  35%  { transform: translateX(0.9vmin); }
+  55%  { transform: translateX(-0.5vmin); }
+  75%  { transform: translateX(0.5vmin); }
+}
+.hole-wrap.whacked .dude-stage {
+  animation: shake 0.22s ease;
+}
+
+/* Score float */
+.score-pop {
+  position: fixed;
+  font-size: 3.8vmin;
+  font-weight: bold;
+  color: #FFD700;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 12px rgba(255,215,0,0.6);
+  pointer-events: none;
+  z-index: 300;
+  animation: float-up 0.75s ease-out forwards;
+  transform: translateX(-50%);
+}
+@keyframes float-up {
+  0%   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  60%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-6vmin) scale(1.5); }
+}
+
+/* ── MALLET ──────────────────────────────────────────────────── */
+#mallet {
+  position: fixed;
+  width: 16vmin;
+  height: 26vmin;
+  pointer-events: none;
+  z-index: 1000;
+  transform-origin: 50% 88%;
+  will-change: transform, left, top;
+  display: none;
+}
+#mallet.swing {
+  animation: mallet-swing 0.18s ease-out;
+}
+@keyframes mallet-swing {
+  0%   { transform: rotate(0deg); }
+  35%  { transform: rotate(38deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* ── OVERLAYS ────────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.65);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/* End screen stays light & top-anchored so the dance party shows through */
+#end-overlay {
+  background: rgba(0, 0, 0, 0.28);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  justify-content: flex-start;
+  padding-top: 4vmin;
+}
+
+.overlay-box {
+  background: linear-gradient(145deg, #2e1400, #160800);
+  border: 0.4vmin solid #FFD700;
+  border-radius: 3vmin;
+  padding: 5vmin 6vmin;
+  text-align: center;
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.25), 0 8px 32px rgba(0,0,0,0.7);
+  max-width: 65vmin;
+}
+
+.overlay-box h1 {
+  color: #FFD700;
+  font-size: 5.5vmin;
+  margin-bottom: 2vmin;
+  text-shadow: 0 0 20px rgba(255,215,0,0.7);
+  line-height: 1.1;
+}
+
+.overlay-box p {
+  color: #ffeecc;
+  font-size: 2.4vmin;
+  margin-bottom: 1vmin;
+  line-height: 1.6;
+  font-family: Arial, sans-serif;
+  font-weight: normal;
+}
+
+.final-score {
+  color: #FFD700 !important;
+  font-size: 6vmin !important;
+  font-weight: bold;
+  margin: 2vmin 0 !important;
+}
+
+.rating {
+  color: #FF9 !important;
+  font-size: 2.8vmin !important;
+}
+
+.btn {
+  background: linear-gradient(145deg, #FFD700, #FFA500);
+  color: #1a0800;
+  border: none;
+  border-radius: 2vmin;
+  font-size: 2.8vmin;
+  font-weight: bold;
+  padding: 1.6vmin 4.5vmin;
+  cursor: none;
+  font-family: 'Arial Rounded MT Bold', 'Arial Black', Arial, sans-serif;
+  box-shadow: 0 4px 18px rgba(255, 165, 0, 0.45);
+  transition: transform 0.1s, box-shadow 0.1s;
+  margin-top: 2.5vmin;
+}
+.btn:hover { transform: scale(1.06); box-shadow: 0 6px 22px rgba(255,165,0,0.65); }
+.btn:active { transform: scale(0.96); }
+
+/* ── CLOUDS (decoration) ─────────────────────────────────────── */
+.cloud {
+  position: fixed;
+  background: white;
+  border-radius: 50px;
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 0;
+}
+.cloud::before, .cloud::after {
+  content: '';
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+}
+</style>
+</head>
+<body>
+
+<!-- Shared SVG gradients (referenced by every figure) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="shaftGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"    stop-color="#D89868"/>
+      <stop offset="0.16" stop-color="#FFD0A8"/>
+      <stop offset="0.48" stop-color="#FFE4C6"/>
+      <stop offset="0.82" stop-color="#EFB386"/>
+      <stop offset="1"    stop-color="#CC8E5E"/>
+    </linearGradient>
+    <radialGradient id="glansGrad" cx="0.38" cy="0.30" r="0.78">
+      <stop offset="0"    stop-color="#FFCBC2"/>
+      <stop offset="0.55" stop-color="#FF9E96"/>
+      <stop offset="1"    stop-color="#DC6C64"/>
+    </radialGradient>
+    <radialGradient id="ballGrad" cx="0.40" cy="0.34" r="0.85">
+      <stop offset="0"    stop-color="#FFD6B0"/>
+      <stop offset="0.68" stop-color="#E8A878"/>
+      <stop offset="1"    stop-color="#C0834F"/>
+    </radialGradient>
+  </defs>
+</svg>
+
+<!-- Clouds -->
+<div class="cloud" style="width:14vmin;height:5vmin;top:5vmin;left:8vw;">
+  <div style="position:absolute;width:8vmin;height:8vmin;border-radius:50%;background:white;top:-4vmin;left:2vmin;"></div>
+  <div style="position:absolute;width:6vmin;height:6vmin;border-radius:50%;background:white;top:-3vmin;left:6vmin;"></div>
+</div>
+<div class="cloud" style="width:10vmin;height:4vmin;top:12vmin;right:12vw;opacity:0.5;">
+  <div style="position:absolute;width:6vmin;height:6vmin;border-radius:50%;background:white;top:-3vmin;left:1vmin;"></div>
+  <div style="position:absolute;width:5vmin;height:5vmin;border-radius:50%;background:white;top:-2.5vmin;left:4vmin;"></div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="hud-title">🍆 WHACK-A-D*CK</div>
+  <div class="hud-stat" id="hud-score">Score: <b id="score-val">0</b></div>
+  <div class="hud-stat" id="hud-timer">Time: <b id="timer-val">60</b>s</div>
+  <button id="mute-btn" onclick="toggleMute()">🔊</button>
+</div>
+
+<!-- Game Board -->
+<div id="board">
+  <div id="grid"></div>
+</div>
+
+<!-- Mallet SVG cursor -->
+<div id="mallet">
+  <svg viewBox="0 0 90 160" xmlns="http://www.w3.org/2000/svg">
+    <!-- Handle -->
+    <rect x="38" y="52" width="14" height="108" rx="7" fill="#C8A060" stroke="#7A5010" stroke-width="2"/>
+    <!-- Handle grip rings -->
+    <rect x="38" y="100" width="14" height="7" rx="2" fill="#6B3E0A" opacity="0.55"/>
+    <rect x="38" y="114" width="14" height="7" rx="2" fill="#6B3E0A" opacity="0.55"/>
+    <rect x="38" y="128" width="14" height="7" rx="2" fill="#6B3E0A" opacity="0.55"/>
+    <rect x="38" y="142" width="14" height="7" rx="2" fill="#6B3E0A" opacity="0.55"/>
+    <!-- Mallet head body -->
+    <rect x="5" y="5" width="80" height="54" rx="10" fill="#4A2E0E" stroke="#2A1500" stroke-width="2.5"/>
+    <!-- Mallet head wood grain highlight -->
+    <rect x="10" y="10" width="70" height="18" rx="7" fill="rgba(255,255,255,0.1)"/>
+    <!-- Metal bands on head -->
+    <rect x="5" y="28" width="80" height="7" rx="0" fill="#7A6040" opacity="0.55"/>
+    <!-- Striking face shading -->
+    <rect x="5" y="5" width="14" height="54" rx="10" fill="rgba(0,0,0,0.2)"/>
+    <rect x="71" y="5" width="14" height="54" rx="10" fill="rgba(0,0,0,0.12)"/>
+  </svg>
+</div>
+
+<!-- Start Overlay -->
+<div class="overlay" id="start-overlay">
+  <div class="overlay-box">
+    <h1>🍆 WHACK-A-D*CK</h1>
+    <p>Dingalings are popping up!<br>Whack 'em before they disappear.<br>60 seconds on the clock. Go!</p>
+    <button class="btn" onclick="startGame()">LET'S WHACK!</button>
+  </div>
+</div>
+
+<!-- End Overlay -->
+<div class="overlay" id="end-overlay" style="display:none">
+  <div class="overlay-box">
+    <h1>⏰ TIME'S UP!</h1>
+    <p>Final Score:</p>
+    <p class="final-score" id="final-score-val">0</p>
+    <p class="rating" id="rating-text"></p>
+    <button class="btn" onclick="startGame()">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+// ─── Inline Penis SVG ─────────────────────────────────────────────────────────
+function makeDudeSVG() {
+  return `<svg class="dude" viewBox="0 0 80 200" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg">
+    <!-- Scrotum -->
+    <ellipse cx="29" cy="180" rx="23" ry="19" fill="url(#ballGrad)" stroke="#B07848" stroke-width="1.4"/>
+    <ellipse cx="52" cy="183" rx="22" ry="18" fill="url(#ballGrad)" stroke="#B07848" stroke-width="1.4"/>
+    <path d="M41 164 Q39.5 182 41 199" stroke="#B07848" stroke-width="1.5" fill="none" opacity="0.55"/>
+    <!-- Shaft -->
+    <rect x="25" y="50" width="30" height="132" rx="15" fill="url(#shaftGrad)" stroke="#C88858" stroke-width="1.1"/>
+    <!-- Veins -->
+    <path d="M34 72 Q27 108 33 148" stroke="#C2856A" stroke-width="2.4" fill="none" opacity="0.40" stroke-linecap="round"/>
+    <path d="M48 84 Q54 116 46 156" stroke="#C2856A" stroke-width="1.9" fill="none" opacity="0.30" stroke-linecap="round"/>
+    <!-- Shaft highlight -->
+    <rect x="31" y="60" width="7" height="114" rx="3.5" fill="rgba(255,255,255,0.30)"/>
+    <!-- Glans (head) -->
+    <ellipse cx="40" cy="46" rx="25" ry="27" fill="url(#glansGrad)" stroke="#D87870" stroke-width="1.1"/>
+    <!-- Corona ridge -->
+    <path d="M16 57 Q40 75 64 57" stroke="#CF655D" stroke-width="2.6" fill="none" opacity="0.65" stroke-linecap="round"/>
+    <!-- Glans highlight -->
+    <ellipse cx="31" cy="31" rx="8" ry="10" fill="rgba(255,255,255,0.38)"/>
+    <!-- Meatus (tip) -->
+    <ellipse cx="40" cy="22" rx="2.4" ry="5" fill="#BF564E"/>
+    <!-- Happy googly eyes -->
+    <circle cx="31" cy="44" r="8.5" fill="#fff" stroke="#D8A89E" stroke-width="0.8"/>
+    <circle cx="49" cy="44" r="8.5" fill="#fff" stroke="#D8A89E" stroke-width="0.8"/>
+    <circle cx="32.5" cy="42" r="4.2" fill="#1a1a1a"/>
+    <circle cx="50.5" cy="42" r="4.2" fill="#1a1a1a"/>
+    <circle cx="34" cy="40.5" r="1.5" fill="#fff"/>
+    <circle cx="52" cy="40.5" r="1.5" fill="#fff"/>
+    <!-- Happy smile -->
+    <path d="M31 55 Q40 63 49 55" stroke="#B5453E" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+// ─── Build 3×3 Grid ───────────────────────────────────────────────────────────
+const grid = document.getElementById('grid');
+const holes = [];
+
+for (let i = 0; i < 9; i++) {
+  const wrap = document.createElement('div');
+  wrap.className = 'hole-wrap';
+  wrap.innerHTML = `
+    <div class="ground-patch"></div>
+    <div class="dude-stage">${makeDudeSVG()}</div>
+    <div class="hole-oval"></div>
+  `;
+  grid.appendChild(wrap);
+  holes.push({ el: wrap, stage: wrap.querySelector('.dude-stage'), state: 'idle', timer: null });
+}
+
+// ─── Game State ───────────────────────────────────────────────────────────────
+let score = 0;
+let timeLeft = 60;
+let gameActive = false;
+let countdownInterval = null;
+let spawnTimeout = null;
+let difficultyInterval = null;
+let difficulty = 1.0;
+
+function startGame() {
+  document.getElementById('start-overlay').style.display = 'none';
+  document.getElementById('end-overlay').style.display = 'none';
+  score = 0;
+  timeLeft = 60;
+  difficulty = 1.0;
+  gameActive = true;
+  updateHUD();
+
+  holes.forEach(h => {
+    h.state = 'idle';
+    h.el.classList.remove('up', 'hiding', 'whacked', 'dancing');
+    const d = h.el.querySelector('.dude');
+    d.style.animationDelay = '';
+    d.style.animationDuration = '';
+    clearTimeout(h.timer);
+    h.timer = null;
+  });
+
+  clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    timeLeft--;
+    updateHUD();
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+
+  clearInterval(difficultyInterval);
+  difficultyInterval = setInterval(() => {
+    difficulty = Math.min(difficulty * 1.13, 3.8);
+  }, 10000);
+
+  clearTimeout(spawnTimeout);
+  spawnLoop();
+  startMusic(MELODY);
+}
+
+function endGame() {
+  gameActive = false;
+  clearInterval(countdownInterval);
+  clearInterval(difficultyInterval);
+  clearTimeout(spawnTimeout);
+
+  // 🎉 Dance party: every dude pops up and bobs/wags, each slightly out of sync.
+  holes.forEach((h, i) => {
+    clearTimeout(h.timer);
+    h.state = 'party';
+    h.el.classList.remove('hiding', 'whacked', 'up');
+    const d = h.el.querySelector('.dude');
+    d.style.animationDelay = (i * 0.07) + 's';
+    d.style.animationDuration = (0.42 + (i % 3) * 0.07) + 's';
+    h.el.classList.add('dancing');
+  });
+
+  // Switch to the celebratory end-game tune.
+  startMusic(END_MELODY);
+
+  const ratings = [
+    [0,   'Did you forget to click? 😐'],
+    [50,  'Nice warm-up! 😏'],
+    [100, 'Getting there! 👍'],
+    [200, 'Solid whacker! 💪'],
+    [300, 'Master whacker! 🏆'],
+    [500, 'LEGENDARY WHACKER 🔥🏆🔥'],
+  ];
+  let ratingText = ratings[0][1];
+  for (const [threshold, text] of ratings) {
+    if (score >= threshold) ratingText = text;
+  }
+
+  document.getElementById('final-score-val').textContent = score;
+  document.getElementById('rating-text').textContent = ratingText;
+
+  // Let the party run a moment before the results slide in.
+  setTimeout(() => {
+    document.getElementById('end-overlay').style.display = 'flex';
+  }, 2400);
+}
+
+function updateHUD() {
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('timer-val').textContent = timeLeft;
+}
+
+// ─── Spawn Loop ───────────────────────────────────────────────────────────────
+function spawnLoop() {
+  if (!gameActive) return;
+  const minDelay = Math.max(200, 500 / difficulty);
+  const maxDelay = Math.max(400, 1100 / difficulty);
+  const delay = minDelay + Math.random() * (maxDelay - minDelay);
+
+  spawnTimeout = setTimeout(() => {
+    if (!gameActive) return;
+    const idle = holes.filter(h => h.state === 'idle');
+    if (idle.length > 0) {
+      const h = idle[Math.floor(Math.random() * idle.length)];
+      popup(h);
+    }
+    spawnLoop();
+  }, delay);
+}
+
+function popup(h) {
+  if (!gameActive) return;
+  h.state = 'rising';
+  h.el.classList.remove('hiding', 'whacked');
+  h.el.classList.add('up');
+
+  const upTime = Math.max(300, (700 + Math.random() * 600) / difficulty);
+  h.state = 'up';
+
+  clearTimeout(h.timer);
+  h.timer = setTimeout(() => {
+    if (h.state === 'up') retreat(h);
+  }, upTime);
+}
+
+function retreat(h) {
+  clearTimeout(h.timer);
+  h.state = 'falling';
+  h.el.classList.remove('up', 'whacked');
+  h.el.classList.add('hiding');
+  h.timer = setTimeout(() => {
+    h.el.classList.remove('hiding');
+    h.state = 'idle';
+  }, 420);
+}
+
+// ─── Hit Detection ────────────────────────────────────────────────────────────
+function whack(h) {
+  if (!gameActive || h.state !== 'up') return;
+  h.state = 'hit'; // guard: can't re-whack the same dude before it retreats
+  score += 10;
+  updateHUD();
+  playThwack();
+  spawnScorePop(h.el);
+
+  h.el.classList.add('whacked');
+  clearTimeout(h.timer);
+  setTimeout(() => retreat(h), 60);
+}
+
+// Hit test: clicking ANYWHERE over a raised dude's whole cell (the figure,
+// the hole, and the mound around it) counts. Big, forgiving target.
+function tryWhack(px, py) {
+  if (!gameActive) return;
+  const pad = 1 * vmin; // extra slop around the cell
+  for (const h of holes) {
+    if (h.state !== 'up') continue;
+    const r = h.el.getBoundingClientRect(); // h.el = the full grid cell
+    if (px >= r.left - pad && px <= r.right + pad &&
+        py >= r.top  - pad && py <= r.bottom + pad) {
+      whack(h);
+      return; // one whack per swing
+    }
+  }
+}
+
+function spawnScorePop(el) {
+  const rect = el.getBoundingClientRect();
+  const pop = document.createElement('div');
+  pop.className = 'score-pop';
+  pop.textContent = '+10';
+  pop.style.left = (rect.left + rect.width / 2) + 'px';
+  pop.style.top = (rect.top + rect.height * 0.25) + 'px';
+  document.body.appendChild(pop);
+  pop.addEventListener('animationend', () => pop.remove());
+}
+
+// ─── Mallet Cursor ────────────────────────────────────────────────────────────
+const mallet = document.getElementById('mallet');
+let vmin = Math.min(window.innerWidth, window.innerHeight) / 100;
+
+window.addEventListener('resize', () => {
+  vmin = Math.min(window.innerWidth, window.innerHeight) / 100;
+});
+
+// Mallet element size (must match #mallet width/height in CSS).
+const MALLET_VW = 16, MALLET_VH = 26;   // vmin
+// Bottom of the head as a fraction of the element height (head rect spans
+// y≈5..59 of the 160-unit viewBox).
+const HEAD_BOTTOM_F = 0.37;
+
+// Anchor the mallet so the bottom-center of its head sits at the pointer.
+function malletAnchor(px, py) {
+  return {
+    left: px - (MALLET_VW / 2) * vmin,
+    top:  py - (HEAD_BOTTOM_F * MALLET_VH) * vmin,
+  };
+}
+
+function positionMallet(x, y) {
+  const a = malletAnchor(x, y);
+  mallet.style.left = a.left + 'px';
+  mallet.style.top  = a.top  + 'px';
+}
+
+function swingMallet() {
+  mallet.classList.remove('swing');
+  void mallet.offsetWidth;
+  mallet.classList.add('swing');
+}
+
+mallet.addEventListener('animationend', () => mallet.classList.remove('swing'));
+
+document.addEventListener('mousemove', e => {
+  mallet.style.display = 'block';
+  positionMallet(e.clientX, e.clientY);
+});
+
+document.addEventListener('mouseleave', () => { mallet.style.display = 'none'; });
+
+document.addEventListener('mousedown', e => {
+  swingMallet();
+  tryWhack(e.clientX, e.clientY);
+});
+
+document.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  mallet.style.display = 'block';
+  positionMallet(t.clientX, t.clientY);
+  swingMallet();
+  tryWhack(t.clientX, t.clientY);
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+  const t = e.touches[0];
+  positionMallet(t.clientX, t.clientY);
+}, { passive: true });
+
+// ─── Web Audio ────────────────────────────────────────────────────────────────
+let ctx = null;
+let masterGain = null;
+let muted = false;
+let musicIdx = 0;
+let musicTimer = null;
+let musicOn = false;
+let activeMelody = null;
+
+function ensureAudio() {
+  if (ctx) {
+    if (ctx.state === 'suspended') ctx.resume();
+    return;
+  }
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = ctx.createGain();
+  masterGain.gain.value = 0.35;
+  masterGain.connect(ctx.destination);
+}
+
+document.addEventListener('click', ensureAudio, { once: true });
+document.addEventListener('touchstart', ensureAudio, { once: true });
+
+// Goofy circus-ish melody (freq Hz, duration ms)
+const MELODY = [
+  [523,120],[523,120],[659,120],[523,120],[698,120],[659,240],
+  [523,120],[523,120],[659,120],[523,120],[784,360],
+  [740,120],[698,120],[622,120],[587,120],[523,240],
+  [587,120],[523,120],[494,120],[440,120],[392,240],
+  [440,120],[392,120],[349,120],[330,120],[294,240],
+  [330,120],[349,120],[392,120],[440,120],[494,120],[523,240],
+  [392,120],[440,120],[523,120],[659,120],[784,240],
+  [659,120],[587,120],[523,120],[494,120],[523,480],
+];
+
+// Celebratory, bouncy end-of-game fanfare (freq Hz, duration ms)
+const END_MELODY = [
+  [523,150],[659,150],[784,150],[1047,300],
+  [784,150],[1047,330],
+  [880,150],[988,150],[1047,420],
+  [523,150],[659,150],[784,150],[1047,300],
+  [988,150],[784,150],[659,300],
+  [587,170],[784,170],[988,450],
+  [784,120],[988,120],[1175,120],[988,120],[784,300],
+];
+
+function playMelodyNote() {
+  if (!ctx || !musicOn || !activeMelody) return;
+  const [freq, dur] = activeMelody[musicIdx];
+  musicIdx = (musicIdx + 1) % activeMelody.length;
+
+  const osc = ctx.createOscillator();
+  const env = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = freq;
+  const t = ctx.currentTime;
+  env.gain.setValueAtTime(0, t);
+  env.gain.linearRampToValueAtTime(0.2, t + 0.012);
+  env.gain.exponentialRampToValueAtTime(0.001, t + dur / 1000 * 0.88);
+  osc.connect(env);
+  env.connect(masterGain);
+  osc.start(t);
+  osc.stop(t + dur / 1000);
+
+  musicTimer = setTimeout(playMelodyNote, dur);
+}
+
+function startMusic(melody) {
+  ensureAudio();
+  clearTimeout(musicTimer);
+  activeMelody = melody;
+  musicIdx = 0;
+  musicOn = true;
+  if (!muted) playMelodyNote();
+}
+
+function playThwack() {
+  if (!ctx) return;
+  const srate = ctx.sampleRate;
+  const len   = Math.floor(srate * 0.09);
+  const buf   = ctx.createBuffer(1, len, srate);
+  const data  = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const t = i / len;
+    // Noise burst with sharp attack and exponential decay
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.5) * 0.85;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const g = ctx.createGain();
+  g.gain.value = 0.8;
+  src.connect(g);
+  g.connect(masterGain);
+  src.start();
+}
+
+function toggleMute() {
+  ensureAudio();
+  muted = !muted;
+  if (masterGain) masterGain.gain.value = muted ? 0 : 0.35;
+  document.getElementById('mute-btn').textContent = muted ? '🔇' : '🔊';
+  if (!muted && musicOn) {
+    clearTimeout(musicTimer);
+    playMelodyNote();
+  }
+}
+</script>
+</body>
+</html>
