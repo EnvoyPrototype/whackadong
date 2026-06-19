@@ -3,9 +3,13 @@
 A comedic, single-file browser take on Whack-a-Mole. Cartoon dudes pop up from
 holes — whack them with the mallet cursor before they duck back down.
 
-## Play
+## Play online
 
-Open **`whack.html`** in any modern browser (Chrome, Firefox, Edge, Safari).
+**https://envoyprototype.github.io/whackadong/**
+
+## Run locally
+
+Open **`index.html`** in any modern browser (Chrome, Firefox, Edge, Safari).
 No install, no server, no dependencies — it's one self-contained HTML file.
 
 - **Laptop:** move the mouse to aim the mallet, click to whack.
