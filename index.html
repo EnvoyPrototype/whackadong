@@ -487,8 +487,8 @@ function startGame() {
 
   clearInterval(difficultyInterval);
   difficultyInterval = setInterval(() => {
-    difficulty = Math.min(difficulty * 1.13, 3.8);
-  }, 10000);
+    difficulty = Math.min(difficulty * 1.10, 2.4);
+  }, 12000);
 
   clearTimeout(spawnTimeout);
   spawnLoop();
@@ -545,8 +545,8 @@ function updateHUD() {
 // ─── Spawn Loop ───────────────────────────────────────────────────────────────
 function spawnLoop() {
   if (!gameActive) return;
-  const minDelay = Math.max(200, 500 / difficulty);
-  const maxDelay = Math.max(400, 1100 / difficulty);
+  const minDelay = Math.max(300, 550 / difficulty);
+  const maxDelay = Math.max(650, 1200 / difficulty);
   const delay = minDelay + Math.random() * (maxDelay - minDelay);
 
   spawnTimeout = setTimeout(() => {
@@ -566,7 +566,7 @@ function popup(h) {
   h.el.classList.remove('hiding', 'whacked');
   h.el.classList.add('up');
 
-  const upTime = Math.max(300, (700 + Math.random() * 600) / difficulty);
+  const upTime = Math.max(650, (1200 + Math.random() * 600) / difficulty);
   h.state = 'up';
 
   clearTimeout(h.timer);
@@ -600,20 +600,27 @@ function whack(h) {
   setTimeout(() => retreat(h), 60);
 }
 
-// Hit test: clicking ANYWHERE over a raised dude's whole cell (the figure,
-// the hole, and the mound around it) counts. Big, forgiving target.
+// Hit test: whack the raised dude the mallet HEAD is actually covering when
+// you click — "what you see is what you hit." If the head overlaps more than
+// one, take the one it covers most; otherwise fall back to the cell directly
+// under the pointer. Both the head and the cells are large, so it's forgiving.
 function tryWhack(px, py) {
   if (!gameActive) return;
-  const pad = 1 * vmin; // extra slop around the cell
+  const head = malletHeadBox(px, py);
+  let best = null, bestArea = 0, fallback = null;
   for (const h of holes) {
     if (h.state !== 'up') continue;
     const r = h.el.getBoundingClientRect(); // h.el = the full grid cell
-    if (px >= r.left - pad && px <= r.right + pad &&
-        py >= r.top  - pad && py <= r.bottom + pad) {
-      whack(h);
-      return; // one whack per swing
+    const ox = Math.min(head.right, r.right) - Math.max(head.left, r.left);
+    const oy = Math.min(head.bottom, r.bottom) - Math.max(head.top, r.top);
+    if (ox > 0 && oy > 0 && ox * oy > bestArea) { bestArea = ox * oy; best = h; }
+    if (!fallback &&
+        px >= r.left && px <= r.right && py >= r.top && py <= r.bottom) {
+      fallback = h;
     }
   }
+  const target = best || fallback;
+  if (target) whack(target); // one whack per swing
 }
 
 function spawnScorePop(el) {
@@ -637,15 +644,27 @@ window.addEventListener('resize', () => {
 
 // Mallet element size (must match #mallet width/height in CSS).
 const MALLET_VW = 16, MALLET_VH = 26;   // vmin
-// Bottom of the head as a fraction of the element height (head rect spans
-// y≈5..59 of the 160-unit viewBox).
-const HEAD_BOTTOM_F = 0.37;
+// The head (striking block) as fractions of the element box, from the SVG
+// viewBox (90×160): x≈5..85, y≈5..59.
+const HEAD_LEFT_F = 0.06, HEAD_RIGHT_F = 0.94, HEAD_TOP_F = 0.03, HEAD_BOTTOM_F = 0.37;
 
 // Anchor the mallet so the bottom-center of its head sits at the pointer.
 function malletAnchor(px, py) {
   return {
     left: px - (MALLET_VW / 2) * vmin,
     top:  py - (HEAD_BOTTOM_F * MALLET_VH) * vmin,
+  };
+}
+
+// On-screen rectangle of the mallet's head — this is what the player aims
+// with, so it's also what we hit-test against.
+function malletHeadBox(px, py) {
+  const a = malletAnchor(px, py);
+  return {
+    left:   a.left + HEAD_LEFT_F   * MALLET_VW * vmin,
+    right:  a.left + HEAD_RIGHT_F  * MALLET_VW * vmin,
+    top:    a.top  + HEAD_TOP_F    * MALLET_VH * vmin,
+    bottom: a.top  + HEAD_BOTTOM_F * MALLET_VH * vmin,
   };
 }
 
